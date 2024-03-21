@@ -1,63 +1,64 @@
 resources:
-- name: concourse-test-repo
+- name: liberator-repo
   type: git
   icon: github
   source:
     private_key: ((concourse-github.private_key))
-    uri: git@github.com:jbourque-ss/concourse-test.git
-    branch: main
+    uri: git@github.com:Simspace/liberator.git
+    branch: LB-330-bg-tasks-service
+- name: python-base-image
+  type: registry-image
+  icon: docker
+  source:
+    username: ((concourse-dockerhub.username))
+    password: ((concourse-dockerhub.password))
+    repository: simspace/ac-python
+    tag: 2.0.0
+- name: ac-loguru-repo
+  type: git
+  icon: github
+  source:
+    private_key: ((concourse-github.private_key))
+    uri: git@github.com:SimSpace-RT/ac-common.git
+    branch: ac_loguru-v2.1.2
 
 jobs:
-- name: build-concourse-test
-  public: true
+- name: integration
   plan:
 
-  - get: concourse-test-repo
+  - get: liberator-repo
+  - get: ac-loguru-repo
+  - get: python-base-image
+    params:
+      format: oci
 
-  - task: build-concourse-test-a
+  - task: run-integration-tests
+    privileged: true
     config:
       image_resource:
-        name: ""
         source:
-          repository: concourse/oci-build-task
+          repository: simspace/ac-concourse-dind
+          tag: 0.0.2
+          username: ((concourse-dockerhub.username))
+          password: ((concourse-dockerhub.password))
         type: registry-image
-      inputs:
-      - name: concourse-test-repo
-      outputs:
-      - name: image
-      - name: all-images
-      params:
-        UNPACK_ROOTFS: true
-        CONTEXT: concourse-test-repo
-        DOCKERFILE: concourse-test-repo/ComponentA/Dockerfile
       platform: linux
-      run:
-        path: sh
-        args:
-          - -c
-          - build && cp image/image.tar all-images/concourse-test-a.tar
-    privileged: true
-  
-  - task: build-concourse-test-b
-    config:
-      image_resource:
-        name: ""
-        source:
-          repository: concourse/oci-build-task
-        type: registry-image
       inputs:
-      - name: concourse-test-repo
-      outputs:
-      - name: image
-      - name: all-images
-      params:
-        UNPACK_ROOTFS: true
-        CONTEXT: concourse-test-repo
-        DOCKERFILE: concourse-test-repo/ComponentB/Dockerfile
-      platform: linux
+      - name: liberator-repo
+      - name: python-base-image
+      - name: ac-loguru-repo
       run:
-        path: sh
+        path: entrypoint.sh
         args:
-          - -c
-          - build && cp image/image.tar all-images/concourse-test-b.tar
-    privileged: true
+        - bash
+        - -ceux
+        - |
+          eval $(ssh-agent)
+          docker load < python-base-image/image.tar
+          cd liberator-repo
+          mkdir deps
+          cp -R ../ac-loguru-repo deps/ac_loguru-v2.1.2
+          rm -rf deps/ac_loguru-v2.1.2/.git
+          make build-liberator
+          make build-tests
+          make run-unit-tests

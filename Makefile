@@ -5,26 +5,28 @@ init-docker-net:
 	fi
     
 build-a:
-	docker build . -f ComponentA/Dockerfile -t jbn/concourse-test-a:0.0.1
+	docker build . -f ComponentA/Dockerfile -t jbn/component-a:0.0.1
 
 run-a: init-docker-net
-	docker run -it -d --rm --network concourse-test --name concourse-test-a jbn/concourse-test-a:0.0.1
+	docker run -it -d --rm --network concourse-test --name component-a jbn/component-a:0.0.1
 
 stop-a:
-	@if [ -n "$(shell docker ps -q --filter 'name=concourse-test-a')" ]; then \
-		docker rm -f concourse-test-a ; \
+	@if [ -n "$(shell docker ps -q --filter 'name=component-a')" ]; then \
+		docker rm -f component-a ; \
 	fi
 
 build-b:
-	docker build . -f ComponentB/Dockerfile -t jbn/concourse-test-b:0.0.1
+	docker build . -f ComponentB/Dockerfile -t jbn/component-b:0.0.1
 
 run-b: init-docker-net
-	docker run -it -d --rm --network concourse-test --name concourse-test-b jbn/concourse-test-b:0.0.1
+	docker run -it -d --rm --network concourse-test --name component-b jbn/component-b:0.0.1
 
 stop-b:
-	@if [ -n "$(shell docker ps -q --filter 'name=concourse-test-b')" ]; then \
-		docker rm -f concourse-test-b ; \
+	@if [ -n "$(shell docker ps -q --filter 'name=component-b')" ]; then \
+		docker rm -f component-b ; \
 	fi
+
+build: build-a build-b
 
 run: run-a run-b
 
